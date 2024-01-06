@@ -1,0 +1,1167 @@
+---
+title: "Classification project - main"
+author: "Kosar Ghazali"
+date: "2023-07-09"
+output:
+  html_document:
+    df_print: paged
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(GGally)
+library(ggplot2)
+library(caret)
+library(e1071)
+library(pROC)
+set.seed(42)
+```
+
+```{r}
+library(readr)
+heart <- read_csv("E:/university stuff/Applied Statical Analysis/Project/heart.csv", 
+    col_types = cols(Sex = col_factor(levels = c("M", 
+        "F")), ChestPainType = col_factor(levels = c("TA", 
+        "ATA", "NAP", "ASY")), FastingBS = col_factor(levels = c("0", 
+        "1")), RestingECG = col_factor(levels = c("Normal", 
+        "ST", "LVH")), ExerciseAngina = col_factor(levels = c("Y", 
+        "N")), ST_Slope = col_factor(levels = c("Up", 
+        "Flat", "Down")), HeartDisease = col_factor(levels = c("0", 
+        "1"))))
+```
+
+**Introduction**
+
+**Data Description**
+
+```{r}
+# Number of records
+num_records <- nrow(heart)
+cat("The number of records in the 'heart' data frame is:", num_records)
+
+# Number of NA
+na_count = function(x){sum(is.na(x))}
+kable(sapply(heart, na_count),col.names = "NA number")
+
+```
+
+```{r}
+skimr::skim(heart)
+```
+
+*Age*
+
+The age column in the dataset represents the age of the patient, expressed in years. Age is a significant factor in the development and progression of heart disease. As individuals grow older, their risk of developing various cardiovascular conditions tends to increase. We will test this later in article.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in Age is : \033[0m", length(unique(heart$Age)), "\n")
+cat("\033[1;31mAnd the unique data in Age are: \033[0m",sort(unique(heart$Age)), "\n\n" )
+```
+
+In this dataset, the variable "Age" encompasses a diverse range of 50 unique data points. These values span between 28 and 77, capturing a wide spectrum of ages. To gain deeper insights into this variable, let's take a look at the summarized statistics below:
+
+```{r}
+age_summary <- summary(heart$Age)
+age_summary_matrix <- matrix(age_summary)
+summary_table <- data.frame(
+  Statistics = c("Minimum", "1st Quartile", "Median", "Mean", "3rd Quartile", "Maximum"),
+  Values = age_summary_matrix
+)
+
+print(summary_table)
+```
+
+```{r}
+ggplot(data=heart,mapping=aes(x = heart$Age, y = heart$HeartDisease))+
+ geom_boxplot(fill=c("darkseagreen3", "lightcoral"))
+```
+
+```{r}
+# Histogram for healthy individuals
+hist(heart$Age[heart$HeartDisease == 0],
+     main = "Age Distribution - Healthy vs. Ill Individuals",
+     xlab = "Age",
+     col = alpha("lightgreen",0.5),
+     border = "black",
+     xlim = range(heart$Age),
+     breaks = 10)
+
+# Histogram for ill individuals (Overlayed)
+hist(heart$Age[heart$HeartDisease == 1],
+     add = TRUE, 
+     col = alpha("firebrick1",0.7), 
+     border = "black" 
+     ) 
+
+```
+
+Upon examining the overlaid histograms, it becomes evident that there is a lower frequency of individuals with heart disease in younger age groups, as we previously discussed. This observation suggests that the occurrence of heart disease tends to be more prevalent in older populations.
+
+*Sex*
+
+The dataset includes information about the sex of the patients, denoted by "M" for males and "F" for females. This allows for an analysis of potential gender-based differences in the dataset.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in Sex is : \033[0m", length(unique(heart$Sex)), "\n")
+cat("\033[1;31mThe unique data in Sex are: \033[0m",unique(heart$Sex), "\n\n" )
+```
+
+```{r}
+table(heart$Sex)
+```
+
+```{r}
+pie(table(heart$Sex), main = "Pie chart of number of Sexs", col = c("lightblue", "lightpink2"), labels = paste0(round(prop.table(table(heart$Sex)) * 100), "%"))
+legend("topright", legend = names(table(heart$Sex)), fill = c("lightblue", "lightpink2"))
+```
+
+```{r}
+ggplot(heart, aes(x = heart$Sex, fill = heart$HeartDisease)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Illness by Gender",
+       x = "Sex",
+       y = "Count") +
+  scale_fill_manual(values=c("darkseagreen3", "lightcoral"))
+```
+
+The distribution of illness by gender can be observed from the plotted data. It is evident that there is a higher number of data points for males compared to females. Additionally, the plot reveals that the rate of ill individuals is higher among males, while females exhibit a lower proportion of ill individuals.
+
+*Chest Pain Type*
+
+The variable "ChestPainType" in the dataset categorizes different types of chest pain and includes the following labels:
+
+-   TA: Typical Angina
+
+-   ATA: Atypical Angina
+
+-   NAP: Non-Anginal Pain
+
+-   ASY: Asymptomatic
+
+```{r}
+cat("\033[1;31mThe Number of unique data in ChestPainType is : \033[0m", length(unique(heart$ChestPainType)), "\n")
+cat("\033[1;31mThe unique data in ChestPainType are: \033[0m",unique(heart$ChestPainType), "\n\n" )
+```
+
+```{r}
+table(heart$ChestPainType)
+```
+
+```{r}
+pie(table(heart$ChestPainType), main = "Pie chart of effect of the chest pain type on heart disease", col = c( "tomato","red2","firebrick","darkred"), labels = paste0(round(prop.table(table(heart$ChestPainType)) * 100), "%"))
+legend("topright", legend = names(table(heart$ChestPainType)), fill = c( "tomato","red2","firebrick","darkred"))
+```
+
+```{r}
+ggplot(heart, aes(x = heart$ChestPainType, fill = heart$HeartDisease)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Illness by Chest Pain Type",
+       x = "Chest Pain Type",
+       y = "Count") +
+  scale_fill_manual(values= c("darkseagreen3", "lightcoral"))
+```
+
+The analysis of the provided histogram and pie chart reveals a predominant concentration of data pertaining to cases involving asymptomatic chest pain. Notably, among all pain types, individuals who experienced asymptomatic pain exhibited a significantly higher number of illnesses. This observation underscores the noteworthy prevalence of asymptomatic chest pain within the dataset.
+
+*Resting BP*
+
+The feature labeled "RestingBP" represents the resting blood pressure of individuals measured in mm Hg. This vital metric provides valuable insights into an individual's cardiovascular health and is often used as an important indicator in various medical studies and clinical assessments.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in RestingBP is : \033[0m", length(unique(heart$RestingBP)), "\n")
+cat("\033[1;31mThe unique data in RestingBP are:  \033[0m",sort(unique(heart$RestingBP)), "\n\n" )
+
+```
+
+```{r}
+length(heart$RestingBP[heart$RestingBP==0])
+```
+
+```{r}
+restingbp_summary <- summary(heart$RestingBP)
+restingbp_summary_matrix <- matrix(restingbp_summary)
+restingbp_summary_table <- data.frame(
+  Statistics = c("Minimum", "1st Quartile", "Median", "Mean", "3rd Quartile", "Maximum"),
+  Values = restingbp_summary_matrix
+)
+
+print(restingbp_summary_table)
+```
+
+```{r}
+ggplot(data=heart,mapping=aes(x = heart$RestingBP, y = heart$HeartDisease))+
+ geom_boxplot(fill=c("darkseagreen3", "lightcoral"))
+```
+
+```{r}
+# Histogram for healthy individuals
+hist(heart$RestingBP[heart$HeartDisease == 0],
+     main = "Resting Blood Pressure Distribution - Healthy vs. Ill Individuals",
+     xlab = "Resting Blood Pressure",
+     col = alpha("lightgreen",0.5),
+     border = "black",
+     breaks = 10)
+
+# Histogram for ill individuals (Overlayed)
+hist(heart$RestingBP[heart$HeartDisease == 1],
+     add = TRUE, 
+     col = alpha("firebrick1",0.7), 
+     border = "black",
+     breaks = 15
+     ) 
+```
+
+The histogram clearly reveals a notable pattern: a higher prevalence of heart disease among individuals with blood pressure levels ranging from 120 to 140. Furthermore, when contrasting the number of individuals afflicted with heart disease to those in good health, it becomes apparent that there is an increased incidence of heart disease in individuals with elevated blood pressure compared to their healthy counterparts.
+
+*Cholesterol*
+
+In this dataset, the variable "cholesterol" represents the serum cholesterol level measured in mm/dL.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in Cholesterol is : \033[0m", length(unique(heart$Cholesterol)), "\n")
+cat("\033[1;31mThe unique data in Cholesterol are:  \033[0m",sort(unique(heart$Cholesterol)), "\n\n" )
+```
+
+```{r}
+cholesterol_summary <- summary(heart$Cholesterol)
+cholesterol_summary_matrix <- matrix(cholesterol_summary)
+cholesterol_summary_table <- data.frame(
+  Statistics = c("Minimum", "1st Quartile", "Median", "Mean", "3rd Quartile", "Maximum"),
+  Values = cholesterol_summary_matrix
+)
+
+print(cholesterol_summary_table)
+```
+
+```{r}
+ggplot(data=heart,mapping=aes(x = heart$Cholesterol, y = heart$HeartDisease))+
+ geom_boxplot(fill=c("darkseagreen3", "lightcoral"))
+```
+
+```{r}
+# Histogram for healthy individuals
+hist(heart$Cholesterol[heart$HeartDisease == 0],
+     main = "Cholesterol Distribution - Healthy vs. Ill Individuals",
+     xlab = "Cholesterol",
+     col = alpha("lightgreen",0.5),
+     border = "black",
+     breaks = 10)
+
+# Histogram for ill individuals (Overlayed)
+hist(heart$Cholesterol[heart$HeartDisease == 1],
+     add = TRUE, 
+     col = alpha("firebrick1",0.7), 
+     border = "black",
+     breaks = 15
+     ) 
+```
+
+The presented histogram and boxplot highlight that a considerable number of individuals diagnosed with heart disease have zero cholesterol levels, which is widely regarded as a dangerous amount. Conversely, the data also indicates that healthier individuals without heart disease tend to fall within the 150 to 250 cholesterol range, which is considered healthy and normal.
+
+*Fasting BS*
+
+In the dataset, the column labeled "FastingBS" represents the fasting blood sugar levels. In this column, a value of 1 is assigned if the fasting blood sugar exceeds 120 mg/dl, while a value of 0 is assigned if it does not. This classification allows us to categorize individuals based on their fasting blood sugar levels and analyze its impact on various health outcomes.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in Fasting BS is : \033[0m", length(unique(heart$FastingBS)), "\n")
+cat("\033[1;31mThe unique data in Fasting BS are: \033[0m",unique(heart$FastingBS), "\n\n" )
+```
+
+```{r}
+table(heart$FastingBS)
+```
+
+```{r}
+pie(table(heart$FastingBS), main = "Pie chart of number of Fasting Blood Sugar", col = c("darkseagreen3", "coral2"), labels = paste0(round(prop.table(table(heart$FastingBS)) * 100), "%"))
+legend("topright", legend = names(table(heart$FastingBS)), fill = c("darkseagreen3", "coral2"))
+```
+
+```{r}
+ggplot(heart, aes(x = heart$FastingBS, fill = heart$HeartDisease)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Illness by Fasting Blood Sugar",
+       x = "Fasting Blood Sugar",
+       y = "Count") +
+  scale_fill_manual(values= c("darkseagreen3", "lightcoral"))
+```
+
+The analysis of our dataset, represented through a histogram and pie chart, reveals a significant trend. The majority of the data points exhibit blood sugar levels below 120, denoted by the category labeled as 0. Moreover, as expected, individuals with heart disease are found to be predominantly concentrated among those with blood sugar levels exceeding 120.
+
+*RestingECG*
+
+The RestingECG column in the study displays the resting electrocardiogram results, which include three categories: **Normal**, indicating a normal heart activity; **ST**, indicating the presence of ST-T wave abnormalities such as T wave inversions or ST elevation/depression of more than 0.05 mV; and **LVH**, indicating the probable or definite presence of left ventricular hypertrophy according to Estes' criteria.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in RestingECG is : \033[0m", length(unique(heart$RestingECG)), "\n")
+cat("\033[1;31mThe unique data in RestingECG are: \033[0m",unique(heart$RestingECG), "\n\n" )
+```
+
+```{r}
+table(heart$RestingECG)
+```
+
+```{r}
+pie(table(heart$RestingECG), main = "Pie chart of number of Resting Electrocardiogram ", col = c("aquamarine3", "coral", "darkgoldenrod1"), labels = paste0(round(prop.table(table(heart$RestingECG)) * 100), "%"))
+legend("topright", legend = names(table(heart$RestingECG)), fill = c("aquamarine3", "coral", "darkgoldenrod1"))
+```
+
+```{r}
+ggplot(heart, aes(x = heart$RestingECG, fill = heart$HeartDisease)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Heart Disease by Resting Electrocardiogram",
+       x = " Resting Electrocardiogram",
+       y = "Count") +
+  scale_fill_manual(values= c("darkseagreen3", "lightcoral"))
+```
+
+```{r}
+# Normal
+ECG_normal = subset(heart, heart$RestingECG == "Normal")
+ECG_normal_count = table(ECG_normal$HeartDisease)["1"]
+total_count_normal =nrow(ECG_normal)
+proportion_ECG_normal = (ECG_normal_count / total_count_normal)*100
+
+# ST
+ECG_ST = subset(heart, heart$RestingECG == "ST")
+ECG_ST_count = table(ECG_ST$HeartDisease)["1"]
+total_count_ST =nrow(ECG_ST)
+proportion_ECG_ST = (ECG_ST_count / total_count_ST)*100
+
+# LVH
+ECG_LVH = subset(heart, heart$RestingECG == "LVH")
+ECG_LVH_count = table(ECG_LVH$HeartDisease)["1"]
+total_count_LVH =nrow(ECG_LVH)
+proportion_ECG_LVH = (ECG_LVH_count / total_count_LVH)*100
+
+
+ecg_data <- data.frame(
+  ECG_Category = c("Normal", "ST", "LVH"),
+  Proportion_of_Heart_Disease = c(proportion_ECG_normal, proportion_ECG_ST, proportion_ECG_LVH)
+)
+
+kable(ecg_data)
+```
+
+The pie chart clearly illustrates that the majority of our data consists of normal resting electrocardiograms, while the remaining data is evenly divided between ST and LVH categories. Furthermore, upon examining the table above and referring to the accompanying histogram, it becomes evident that individuals with ST-T wave abnormality are more likely to have heart disease. This finding highlights a higher proportion of heart disease cases among those with ST abnormalities.
+
+*MaxHR*
+
+In the dataset, MaxHR refers to the maximum heart rate achieved, which is represented by a numeric value ranging from 60 to 202. Maximum heart rate is the highest number of contractions (heartbeats) per minute that an individual's heart can reach during physical exertion. It is an essential measure in assessing cardiovascular fitness and plays a significant role in understanding and managing heart disease.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in MaxHR is : \033[0m", length(unique(heart$MaxHR)), "\n")
+cat("\033[1;31mThe unique data in MaxHR are:  \033[0m",sort(unique(heart$MaxHR)), "\n\n" )
+```
+
+```{r}
+MaxHR_summary <- summary(heart$MaxHR)
+MaxHR_summary_matrix <- matrix(MaxHR_summary)
+MaxHR_summary_table <- data.frame(
+  Statistics = c("Minimum", "1st Quartile", "Median", "Mean", "3rd Quartile", "Maximum"),
+  Values = MaxHR_summary_matrix
+)
+
+print(MaxHR_summary_table)
+```
+
+```{r}
+ggplot(data = heart, mapping = aes(x = heart$MaxHR, y = heart$HeartDisease))+
+ geom_boxplot(fill=c("darkseagreen3", "lightcoral"))
+```
+
+```{r}
+# Histogram for healthy individuals
+hist(heart$MaxHR[heart$HeartDisease == 0],
+     main = "Maximum Heart Rate Distribution - Healthy vs. Ill Individuals",
+     xlab = "Maximum Heart Rate",
+     col = alpha("lightgreen",0.5),
+     border = "black",
+     breaks = 30)
+
+# Histogram for ill individuals (Overlayed)
+hist(heart$MaxHR[heart$HeartDisease == 1],
+     add = TRUE, 
+     col = alpha("firebrick1",0.7), 
+     border = "black",
+     breaks = 30
+     ) 
+```
+
+Through the lens of data science, valuable insights can be gained by analyzing two key visual representations: the histogram and the boxplot. These illustrations provide valuable clues about the connection between maximum heart rate and the presence of heart disease in individuals. Interestingly, a clear pattern emerges, indicating that people with higher maximum heart rates are often not affected by heart-related conditions.
+
+*ExerciseAngina*
+
+The dataset includes a crucial factor called "ExerciseAngina," which provides valuable insights into exercise-induced angina among individuals. This factor employs a binary representation, with "Y" indicating the presence of exercise-induced angina and "N" denoting its absence.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in ExerciseAngina is : \033[0m", length(unique(heart$ExerciseAngina)), "\n")
+cat("\033[1;31mThe unique data in ExerciseAngina are: \033[0m",unique(heart$ExerciseAngina), "\n\n" )
+```
+
+```{r}
+table(heart$ExerciseAngina)
+```
+
+```{r}
+pie(table(heart$ExerciseAngina), main = "Pie chart of number of Exercise Angina", col = c("coral", "aquamarine3"), labels = paste0(round(prop.table(table(heart$ExerciseAngina)) * 100), "%"))
+legend("topright", legend = names(table(heart$ExerciseAngina)), fill = c("coral", "aquamarine3"))
+```
+
+```{r}
+ggplot(heart, aes(x = heart$ExerciseAngina, fill = heart$HeartDisease)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Heart Disease by Exercise Angina ",
+       x = "Exercise Angina",
+       y = "Count") +
+  scale_fill_manual(values= c("darkseagreen3", "lightcoral"))
+```
+
+The barplot provides valuable insights into how exercise-induced angina relates to heart disease in individuals. It shows that many people with exercise-induced angina also have a higher risk of heart disease. On the other hand, those without exercise-induced angina tend to have better health and a lower likelihood of developing heart disease.
+
+*Oldpeak*
+
+The variable "oldpeak" is defined as a quantitative measure of ST segment depression. The ST segment depression is derived from analyzing the electrocardiogram (ECG) waveform and is associated with changes in cardiac health. Oldpeak represents a numeric value that signifies the extent of this depression.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in Oldpeak is : \033[0m", length(unique(heart$Oldpeak)), "\n")
+cat("\033[1;31mThe unique data in Oldpeak are:  \033[0m",sort(unique(heart$Oldpeak)), "\n\n" )
+```
+
+```{r}
+Oldpeak_summary <- summary(heart$Oldpeak)
+Oldpeak_summary_matrix <- matrix(Oldpeak_summary)
+Oldpeak_summary_table <- data.frame(
+  Statistics = c("Minimum", "1st Quartile", "Median", "Mean", "3rd Quartile", "Maximum"),
+  Values = Oldpeak_summary_matrix
+)
+
+print(Oldpeak_summary_table)
+```
+
+```{r}
+ggplot(data = heart, mapping = aes(x = heart$Oldpeak, y = heart$HeartDisease))+
+ geom_boxplot(fill=c("darkseagreen3", "lightcoral"))
+```
+
+```{r}
+# Histogram for healthy individuals
+hist(heart$Oldpeak[heart$HeartDisease == 0],
+     main = "Oldpeak Distribution - Healthy vs. Ill Individuals",
+     xlab = "Oldpeak",
+     col = alpha("lightgreen",0.5),
+     border = "black",
+     breaks = 10)
+
+# Histogram for ill individuals (Overlayed)
+hist(heart$Oldpeak[heart$HeartDisease == 1],
+     add = TRUE, 
+     col = alpha("firebrick1",0.7), 
+     border = "black",
+     breaks = 30
+     ) 
+```
+
+The histogram reveals that individuals with an oldpeak value around 0 have a lower risk of heart disease. On the other hand, few healthy individuals are observed when oldpeak values exceed 2.
+
+*ST_Slope*
+
+Within the dataset, one of the variables called "ST_Slope" provides valuable information regarding the slope of the peak exercise ST segment. This particular segment exhibits three distinct patterns: upsloping, characterized by an upward trajectory and shown by the name "**Up**"; **Flat**, denoting a horizontal orientation; and downsloping, representing a downward inclination and shown by the name "**Down**".
+
+```{r}
+cat("\033[1;31mThe Number of unique data in ST_Slope is : \033[0m", length(unique(heart$ST_Slope)), "\n")
+cat("\033[1;31mThe unique data in ST_Slope are: \033[0m",unique(heart$ST_Slope), "\n\n" )
+```
+
+```{r}
+table(heart$ST_Slope)
+```
+
+```{r}
+pie(table(heart$ST_Slope), main = "Pie chart of number of ST_Slope", col = c("steelblue4", "skyblue3", "slategray1"), labels = paste0(round(prop.table(table(heart$ST_Slope)) * 100), "%"))
+legend("topright", legend = names(table(heart$ST_Slope)), fill = c("steelblue4", "skyblue3", "slategray1"))
+```
+
+```{r}
+ggplot(heart, aes(x = heart$ST_Slope, fill = heart$HeartDisease)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Heart Disease by ST Slope ",
+       x = "ST Slope",
+       y = "Count") +
+  scale_fill_manual(values= c("darkseagreen3", "lightcoral"))
+```
+
+The data visualization tools utilized in this section, namely the pie chart and bar plot, demonstrate that the number of up and flat slopes present in the dataset are almost equivalent, while the down slope is significantly underrepresented. Additionally, the flat slope exhibits the largest proportion of individuals with heart disease, compared to the other two slopes.
+
+**HeartDisease**
+
+The response variable, HeartDisease, represents the output class in our project, with a value of 1 indicating the presence of heart disease and 0 representing a normal condition.
+
+```{r}
+cat("\033[1;31mThe Number of unique data in HeartDisease is : \033[0m", length(unique(heart$HeartDisease)), "\n")
+cat("\033[1;31mThe unique data in HeartDisease are: \033[0m",unique(heart$HeartDisease), "\n\n" )
+```
+
+```{r}
+table(heart$HeartDisease)
+```
+
+```{r}
+pie(table(heart$HeartDisease), main = "Pie chart of number of Heart Disease", col = c("darkseagreen3", "lightcoral"), labels = paste0(round(prop.table(table(heart$HeartDisease)) * 100), "%"))
+legend("topright", legend = names(table(heart$HeartDisease)), fill = c("darkseagreen3", "lightcoral"))
+```
+
+An important observation can be made from both the pie chart and proportion table, indicating that our data exhibits an even distribution. Specifically, we can infer that there is approximately an equal number of instances classified as 0 (representing a normal condition) and 1 (indicating the presence of heart disease) in our response variable. Therefore we do not need further methods to make it even
+
+```{r}
+HD_summary = by(heart, heart$HeartDisease, summary)
+print(kable(as.table(HD_summary$"0"),caption = "Summary of Healthy Cases Statics"))
+
+print(kable(as.table(HD_summary$"1"),caption = "Summary of Cases With Heart Disease Statics"))
+
+```
+
+**Preprocessing**
+
+In our dataset, where no missing values were identified, an anomalous data row was discovered. This particular row exhibited a resting blood pressure value of 0, which is deemed implausible from a physiological standpoint. To optimize the efficiency of our analysis, it was decided to remove this specific row. This approach was chosen based on the rationale that the impact of excluding a single row, amidst nearly 1000 others, would be negligible.
+
+```{r}
+row_index <- which(heart$RestingBP == 0)
+heart <- heart[-row_index, ]
+```
+
+```{r}
+# Dividing into test and train
+trn_idx = sample(nrow(heart), size = 0.8 * nrow(heart))
+heart_trn = heart[trn_idx, ]
+heart_tst = heart[-trn_idx, ]
+
+# Dividing into estimation and validation
+est_idx = sample(nrow(heart_trn), size = 0.8 * nrow(heart_trn))
+heart_est = heart_trn[est_idx, ]
+heart_val = heart_trn[-est_idx, ]
+```
+
+```{r}
+ggpairs(heart_est, progress = FALSE)
+```
+
+```{r}
+ggplot(data = heart_est,mapping = aes(x=heart_est$Age, y= heart_est$RestingBP ))+
+  geom_point()+
+  geom_smooth()
+
+ggplot(data = heart_est,mapping = aes(x=heart_est$Age, y= heart_est$Cholesterol ))+
+  geom_point()+
+  geom_smooth()
+
+ggplot(data = heart_est,mapping = aes(x=heart_est$Age, y= heart_est$MaxHR ))+
+  geom_point()+
+  geom_smooth()
+
+ggplot(data = heart_est,mapping = aes(x=heart_est$Age, y= heart_est$Oldpeak ))+
+  geom_point()+
+  geom_smooth()
+```
+
+Combining the insights gained from the above plots and performing additional coefficient calculations can help determine whether we should include interaction terms between age and other variables in our models or not.
+
+```{r}
+ggplot(data=heart_est,mapping=aes(x = heart_est$RestingBP, y = heart_est$Sex))+
+ geom_boxplot(fill=c("lightblue", "lightpink2"))
+
+ggplot(data=heart_est,mapping=aes(x = heart_est$Cholesterol, y = heart_est$Sex))+
+ geom_boxplot(fill=c("lightblue", "lightpink2"))
+
+ggplot(data=heart_est,mapping=aes(x = heart_est$MaxHR, y = heart_est$Sex))+
+ geom_boxplot(fill=c("lightblue", "lightpink2"))
+
+ggplot(data=heart_est,mapping=aes(x = heart_est$Oldpeak, y = heart_est$Sex))+
+ geom_boxplot(fill=c("lightblue", "lightpink2"))
+```
+
+In the boxplots, we examined the interaction between sex and other variables to assess whether there were significant differences between males and females. Our findings indicate that no significant differences were observed in fasting blood pressure and cholesterol levels between males and females. However, distinct differences were evident in two other variables, namely maximum heart rate and oldpeak. To optimize our modeling endeavors, these insights should be combined with coefficient analysis for obtaining the most accurate results.
+
+*Normalization*
+
+We can normalize numeric data in order to get the most accurate result. Normalization ensures that the numerical features are on a similar scale, which can have several benefits such as improving model performance and faster convergence.
+
+```{r}
+# Estimation normalization
+heart_est_norm = heart_est
+
+# Age normalization
+heart_est_norm$Age.std = scale(heart_est_norm$Age)
+Age.center = attr(heart_est_norm$Age.std,"scaled:center")
+Age.scale = attr(heart_est_norm$Age.std,"scaled:scale")
+
+# RestingBP normalization
+heart_est_norm$RestingBP.std = scale(heart_est_norm$RestingBP)
+RestingBP.center = attr(heart_est_norm$RestingBP.std,"scaled:center")
+RestingBP.scale = attr(heart_est_norm$RestingBP.std,"scaled:scale")
+
+# Cholesterol normalization
+heart_est_norm$Cholesterol.std = scale(heart_est_norm$Cholesterol)
+Cholesterol.center = attr(heart_est_norm$Cholesterol.std,"scaled:center")
+Cholesterol.scale = attr(heart_est_norm$Cholesterol.std,"scaled:scale")
+
+# MaxHR normalization
+heart_est_norm$MaxHR.std = scale(heart_est_norm$MaxHR)
+MaxHR.center = attr(heart_est_norm$MaxHR.std,"scaled:center")
+MaxHR.scale = attr(heart_est_norm$MaxHR.std,"scaled:scale")
+
+# Oldpeak normalization
+heart_est_norm$Oldpeak.std = scale(heart_est_norm$Oldpeak)
+Oldpeak.center = attr(heart_est_norm$Oldpeak.std,"scaled:center")
+Oldpeak.scale = attr(heart_est_norm$Oldpeak.std,"scaled:scale")
+```
+
+```{r}
+# Validation normalization
+heart_val_norm = heart_val
+
+# Age normalization
+heart_val_norm$Age.std = scale(heart_val_norm$Age, center = Age.center, scale = Age.scale)
+
+# RestingBP normalization
+heart_val_norm$RestingBP.std = scale(heart_val_norm$RestingBP, center = RestingBP.center, scale = RestingBP.scale)
+
+# Cholesterol normalization
+heart_val_norm$Cholesterol.std = scale(heart_val_norm$Cholesterol, center = Cholesterol.center, scale = Cholesterol.scale)
+
+# MaxHR normalization
+heart_val_norm$MaxHR.std = scale(heart_val_norm$MaxHR, center = MaxHR.center, scale = MaxHR.scale)
+
+# Oldpeak normalization
+heart_val_norm$Oldpeak.std = scale(heart_val_norm$Oldpeak, center = Oldpeak.center, scale = Oldpeak.scale)
+```
+
+**Implementation**
+
+*Feature Selection*
+
+Variable or feature selection is a crucial step in enhancing model performance and identifying key predictors. There are three commonly employed techniques for this purpose: forward selection, backward elimination, and stepwise selection.
+
+Forward selection involves starting with an empty model and progressively adding one variable at a time based on a criterion like the Akaike Information Criterion (AIC) or Bayesian Information Criterion (BIC). The variable that yields the greatest enhancement to the model's fit is selected at each step until no further improvements can be made.
+
+Conversely, backward elimination begins with a model containing all potential variables and iteratively eliminates one variable at a time using a chosen criterion (e.g., AIC or BIC). The least-contributing variable is discarded at each step until further elimination ceases to significantly enhance the model.
+
+Stepwise selection combines the features of forward selection and backward elimination. It initially employs forward selection to add variables and then utilizes backward elimination to remove variables. This iterative process continues until no further additions or removals result in improved model performance.
+
+In R, there are packages like *leaps*, *stepAIC* from *MASS*, or *glmnet.*
+
+In our project, we have chosen Boruta as our preferred package for feature selection due to its robust and highly effective algorithm. The Boruta algorithm operates in several key steps to identify the most relevant features:
+
+Firstly, it creates shadow features by generating multiple random permutations of each original predictor. These shadow features are then added to the dataset, serving as a baseline for comparison.
+
+Next, a machine learning model such as random forest or XGBoost is trained on the augmented dataset comprising both the original features and their corresponding shadow features. The importance of each variable is evaluated based on its performance compared to the shadow features. Variables that consistently outperform their shadows are considered important.
+
+After evaluating the variable importance, Boruta categorizes the variables into three groups: "Confirmed," "Tentative," and "Rejected." Variables classified as "Confirmed" are deemed important, while those labeled as "Tentative" are not significant compared to the shadow features. "Rejected" variables are considered unimportant.
+
+```{r}
+library(Boruta)
+```
+
+```{r}
+Boruta(heart_est_norm$HeartDisease ~ ., data = heart_est_norm)
+```
+
+In the Boruta() function, all the variables initially appeared to be important in relation to our response variable. However, upon closer examination, it was observed that the variable "RestingECG" did not significantly contribute to the predictive power of the model. This finding suggests that "RestingECG" may not play a crucial role in explaining the variability in our response variable.
+
+*Model Implementation*
+
+```{r}
+# Defining a function to calculate misclassification
+calc_misclass = function(actual, predicted) {
+  mean(actual != predicted)
+}
+```
+
+*LDA*
+
+LDA stands for Linear Discriminant Analysis. This classification technique is widely used in statistics and machine learning. It assumes that the data points within each class are normally distributed with equal covariance matrices. It seeks to find linear combinations of features that maximize the separation between classes.
+
+```{r}
+heart_est_norm <- subset(heart_est_norm, select = -c(Age, RestingBP, MaxHR,Cholesterol, Oldpeak))
+```
+
+```{r}
+library(MASS)
+attach(heart_est)
+simple_lda_model = lda(heart_est$HeartDisease ~ ., data = heart_est)
+simple_lda_val_pred = predict(simple_lda_model, heart_val)$class
+
+simple_lda_val_pred = factor(simple_lda_val_pred, levels = levels(heart_val$HeartDisease))
+simple_lda_val_confusion_matrix = confusionMatrix(simple_lda_val_pred, heart_val$HeartDisease, positive = "1")
+simple_lda_val_missclass = calc_misclass(heart_val$HeartDisease, simple_lda_val_pred )
+simple_lda_val_accuracy = simple_lda_val_confusion_matrix$overall["Accuracy"]
+simple_lda_val_precision = simple_lda_val_confusion_matrix$byClass["Pos Pred Value"]
+simple_lda_val_recall = simple_lda_val_confusion_matrix$byClass["Sensitivity"]
+simple_lda_val_f1_score = simple_lda_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(simple_lda_val_missclass, simple_lda_val_accuracy, simple_lda_val_precision, simple_lda_val_recall, simple_lda_val_f1_score)))
+```
+
+```{r}
+norm_lda_model = lda(heart_est_norm$HeartDisease ~ ., data = heart_est_norm)
+norm_lda_val_pred = predict(norm_lda_model, heart_val_norm)$class
+
+norm_lda_val_confusion_matrix = confusionMatrix(norm_lda_val_pred, heart_val_norm$HeartDisease, positive = "1")
+norm_lda_val_missclass = calc_misclass(heart_val_norm$HeartDisease, norm_lda_val_pred )
+norm_lda_val_accuracy = norm_lda_val_confusion_matrix$overall["Accuracy"]
+norm_lda_val_precision = norm_lda_val_confusion_matrix$byClass["Pos Pred Value"]
+norm_lda_val_recall = norm_lda_val_confusion_matrix$byClass["Sensitivity"]
+norm_lda_val_f1_score = norm_lda_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(norm_lda_val_missclass, norm_lda_val_accuracy, norm_lda_val_precision, norm_lda_val_recall, norm_lda_val_f1_score)))
+```
+
+```{r}
+complex_lda_model = lda(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est)
+complex_lda_val_pred = predict(complex_lda_model, heart_val)$class
+
+
+complex_lda_val_confusion_matrix = confusionMatrix(complex_lda_val_pred, heart_val$HeartDisease, positive = "1")
+complex_lda_val_missclass = calc_misclass(heart_val$HeartDisease, complex_lda_val_pred )
+complex_lda_val_accuracy = complex_lda_val_confusion_matrix$overall["Accuracy"]
+complex_lda_val_precision = complex_lda_val_confusion_matrix$byClass["Pos Pred Value"]
+complex_lda_val_recall = complex_lda_val_confusion_matrix$byClass["Sensitivity"]
+complex_lda_val_f1_score = complex_lda_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(complex_lda_val_missclass, complex_lda_val_accuracy, complex_lda_val_precision, complex_lda_val_recall, complex_lda_val_f1_score)))
+```
+
+So based on missclassification error we can say the *complex_lda_model* is the best among other LDA models.
+
+*QDA*
+
+QDA stands for "Qualitative Data Analysis."It relaxes the assumption of equal covariance matrices and allows each class to have its own covariance matrix. It seeks to find quadratic decision boundaries between classes.
+
+```{r}
+simple_qda_model = qda(heart_est$HeartDisease ~ ., data = heart_est)
+simple_qda_val_pred = predict(simple_qda_model, heart_val)$class
+
+simple_qda_val_confusion_matrix = confusionMatrix(simple_qda_val_pred, heart_val$HeartDisease, positive = "1")
+simple_qda_val_missclass = calc_misclass(heart_val$HeartDisease, simple_qda_val_pred )
+simple_qda_val_accuracy = simple_qda_val_confusion_matrix$overall["Accuracy"]
+simple_qda_val_precision = simple_qda_val_confusion_matrix$byClass["Pos Pred Value"]
+simple_qda_val_recall = simple_qda_val_confusion_matrix$byClass["Sensitivity"]
+simple_qda_val_f1_score = simple_qda_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(simple_qda_val_missclass, simple_qda_val_accuracy, simple_qda_val_precision, simple_qda_val_recall, simple_qda_val_f1_score)))
+```
+
+```{r}
+norm_qda_model = qda(heart_est_norm$HeartDisease ~ ., data = heart_est_norm)
+norm_qda_val_pred = predict(norm_qda_model, heart_val_norm)$class
+
+norm_qda_val_confusion_matrix = confusionMatrix(norm_qda_val_pred, heart_val_norm$HeartDisease, positive = "1")
+norm_qda_val_missclass = calc_misclass(heart_val_norm$HeartDisease, norm_qda_val_pred )
+norm_qda_val_accuracy = norm_qda_val_confusion_matrix$overall["Accuracy"]
+norm_qda_val_precision = norm_qda_val_confusion_matrix$byClass["Pos Pred Value"]
+norm_qda_val_recall = norm_qda_val_confusion_matrix$byClass["Sensitivity"]
+norm_qda_val_f1_score = norm_qda_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(norm_qda_val_missclass, norm_qda_val_accuracy, norm_qda_val_precision, norm_qda_val_recall, norm_qda_val_f1_score)))
+```
+
+```{r}
+complex_qda_model = qda(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est)
+complex_qda_val_pred = predict(complex_qda_model, heart_val)$class
+
+
+complex_qda_val_confusion_matrix = confusionMatrix(complex_qda_val_pred, heart_val$HeartDisease, positive = "1")
+complex_qda_val_missclass = calc_misclass(heart_val$HeartDisease, complex_qda_val_pred )
+complex_qda_val_accuracy = complex_qda_val_confusion_matrix$overall["Accuracy"]
+complex_qda_val_precision = complex_qda_val_confusion_matrix$byClass["Pos Pred Value"]
+complex_qda_val_recall = complex_qda_val_confusion_matrix$byClass["Sensitivity"]
+complex_qda_val_f1_score = complex_qda_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(complex_qda_val_missclass, complex_qda_val_accuracy, complex_qda_val_precision, complex_qda_val_recall, complex_qda_val_f1_score)))
+```
+
+When evaluating the misclassification error, it appears that the *simple_qda_model* and *norm_qda_model* perform comparably well in Quadratic Discriminant Analysis (QDA). Additionally, by comparing the results of QDA with Linear Discriminant Analysis (LDA), we can gather insights suggesting that our model is unlikely to possess quadratic boundaries. These findings prompt further consideration of alternative factors or approaches to enhance the performance of our classification model.
+
+*Naive Bays*
+
+Naive Bayes is a classification algorithm based on Bayes' theorem, which is a fundamental concept in probability theory. It assumes that all the features (or predictors) in a dataset are conditionally independent of each other given the class label.
+
+```{r}
+library(e1071)
+simple_NB_model = naiveBayes(heart_est$HeartDisease ~ ., data = heart_est)
+simple_NB_val_pred = predict(simple_NB_model,heart_val, type = "class" )
+
+
+simple_NB_val_confusion_matrix = confusionMatrix(simple_NB_val_pred, heart_val$HeartDisease)
+simple_NB_val_missclass = calc_misclass(heart_val$HeartDisease, simple_NB_val_pred )
+simple_NB_val_accuracy = simple_NB_val_confusion_matrix$overall["Accuracy"]
+simple_NB_val_precision = simple_NB_val_confusion_matrix$byClass["Pos Pred Value"]
+simple_NB_val_recall = simple_NB_val_confusion_matrix$byClass["Sensitivity"]
+simple_NB_val_f1_score = simple_NB_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(simple_NB_val_missclass, simple_NB_val_accuracy, simple_NB_val_precision, simple_NB_val_recall, simple_NB_val_f1_score)))
+```
+
+```{r}
+complex_NB_model = naiveBayes(heart_est$HeartDisease ~  Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope , data = heart_est)
+complex_NB_val_pred = predict(complex_NB_model,heart_val, type = "class" )
+
+
+complex_NB_val_confusion_matrix = confusionMatrix(complex_NB_val_pred, heart_val$HeartDisease)
+complex_NB_val_missclass = calc_misclass(heart_val$HeartDisease, complex_NB_val_pred )
+complex_NB_val_accuracy = complex_NB_val_confusion_matrix$overall["Accuracy"]
+complex_NB_val_precision = complex_NB_val_confusion_matrix$byClass["Pos Pred Value"]
+complex_NB_val_recall = complex_NB_val_confusion_matrix$byClass["Sensitivity"]
+complex_NB_val_f1_score = complex_NB_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(complex_NB_val_missclass, complex_NB_val_accuracy, complex_NB_val_precision, complex_NB_val_recall, complex_NB_val_f1_score)))
+```
+
+Among the two Naive Bayes models considered, the complex model without interaction exhibits superior misclassification error, making it the preferable choice. However, it is important to mention that this model falls short compared to LDA and QDA in terms of crucial metrics such as F1-score and recall, which will be discussed in detail later in this report. This disparity can be attributed to the underlying assumption of Naive Bayes, where all variables are assumed to be independent, whereas our dataset does not conform to this assumption.
+
+*KNN*
+
+K-nearest neighbors (KNN) is a simple yet powerful algorithm used for both classification and regression tasks in machine learning. It is a non-parametric method that makes predictions based on the similarity of input data points to their k nearest neighbors in the feature space. In this project, we will explore the effectiveness of K-nearest neighbors algorithm by evaluating 100 different instances with various values of k. Specifically, we will focus on odd values for k, as they are often preferred to avoid ties in majority voting.
+
+```{r}
+k_value = seq(1, 101, by = 2)
+
+fit_knn_to_est = function(k) {
+  knn3(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est, k = k)
+}
+
+knn_mods = lapply(k_value, fit_knn_to_est)
+knn_val_pred = lapply(knn_mods, predict, heart_val, type = "class")
+knn_mods_val_misclass = sapply(knn_val_pred, calc_misclass, actual = heart_val$HeartDisease) 
+
+
+min_index_knn = which.min(knn_mods_val_misclass)
+min_val_knn = k_value[[min_index_knn]]
+min_val_knn
+```
+
+So the best KNN model is the model with k = 29.
+
+```{r}
+knn_model =  knn3(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est, k = 29)
+knn_val_pred =  predict(knn_model, heart_val, type = "class" )
+
+knn_val_confusion_matrix = confusionMatrix(knn_val_pred, heart_val$HeartDisease)
+knn_val_missclass = calc_misclass(heart_val$HeartDisease, knn_val_pred )
+knn_val_accuracy = knn_val_confusion_matrix$overall["Accuracy"]
+knn_val_precision = knn_val_confusion_matrix$byClass["Pos Pred Value"]
+knn_val_recall = knn_val_confusion_matrix$byClass["Sensitivity"]
+knn_val_f1_score = knn_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(knn_val_missclass, knn_val_accuracy, knn_val_precision, knn_val_recall, knn_val_f1_score)))
+```
+
+*Tree Models*
+
+A tree model in classification refers to a decision tree-based algorithm used for solving classification problems. It is a type of supervised machine learning algorithm that predicts the class or category of an input based on a set of features.
+
+In a classification tree, the data is split into different branches based on feature values, recursively dividing the data until it reaches terminal nodes called leaves. Each internal node represents a test on a particular feature, and each branch represents the outcome of that test. The leaf nodes represent the predicted class labels.
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+heart_big_tree = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope, data = heart_est, cp = 0.0, minsplit = 20)
+rpart.plot(heart_big_tree)
+kable(heart_big_tree$variable.importance)
+```
+
+```{r}
+tree_models = list(
+  tree_mod_0_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est),
+  tree_mod_1_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS - MaxHR + ExerciseAngina + Oldpeak + ST_Slope,data = heart_est),
+  tree_mod_2_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.5, minsplit = 5),
+  tree_mod_3_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.0005, minsplit = 5),
+  tree_mod_4_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.5, minsplit = 11),
+  tree_mod_5_est =rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.0005, minsplit = 11),
+  tree_mod_6_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.5, minsplit = 15),
+  tree_mod_7_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.0005, minsplit = 15),
+  tree_mod_8_est = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.5, minsplit = 20),
+  tree_mod_9_est= rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.0005, minsplit = 20)
+)
+
+tree_models_val_pred = lapply(tree_models, predict, heart_val, type = "class")
+tree_models_val_misclass = sapply(tree_models_val_pred, calc_misclass, actual = heart_val$HeartDisease)
+
+min_index_val_tree =which.min(tree_models_val_misclass)
+min_index_val_tree 
+```
+
+```{r}
+tree_model = rpart(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope ,data = heart_est, cp = 0.0005, minsplit = 11)
+tree_val_pred =  predict(tree_model, heart_val, type = "class" )
+
+tree_val_confusion_matrix = confusionMatrix(tree_val_pred, heart_val$HeartDisease)
+tree_val_missclass = calc_misclass(heart_val$HeartDisease, tree_val_pred )
+tree_val_accuracy = tree_val_confusion_matrix$overall["Accuracy"]
+tree_val_precision = tree_val_confusion_matrix$byClass["Pos Pred Value"]
+tree_val_recall = tree_val_confusion_matrix$byClass["Sensitivity"]
+tree_val_f1_score = tree_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(tree_val_missclass, tree_val_accuracy, tree_val_precision, tree_val_recall, tree_val_f1_score)))
+```
+
+*Logistic Regression*
+
+Logistic regression is a statistical modeling technique used for binary classification problems. It is a type of regression analysis where the dependent variable is categorical and typically takes one of two values, such as "yes" or "no," "true" or "false," or 1 or 0.
+
+```{r}
+LR_model = glm(formula = HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , family = binomial(link = "logit"), data = heart_est)
+LR_val_pred = predict(LR_model, heart_val, type = "response")
+predicted_classes = ifelse(LR_val_pred > 0.5, 1, 0)
+
+LR_val_confusion_matrix = confusionMatrix(factor(predicted_classes), heart_val$HeartDisease)
+LR_val_missclass = calc_misclass(heart_val$HeartDisease, predicted_classes )
+LR_val_accuracy = LR_val_confusion_matrix$overall["Accuracy"]
+LR_val_precision = LR_val_confusion_matrix$byClass["Pos Pred Value"]
+LR_val_recall = LR_val_confusion_matrix$byClass["Sensitivity"]
+LR_val_f1_score = LR_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(LR_val_missclass, LR_val_accuracy, LR_val_precision, LR_val_recall, LR_val_f1_score)))
+```
+
+```{r}
+calc_metrics_cutoff = function(probs, cutoff) {
+  
+  predict = factor(ifelse(probs > cutoff, "1", "0"))
+  
+  TP = sum(heart_val$HeartDisease == "1" & predict == "1")
+  TN = sum(heart_val$HeartDisease == "0" & predict == "0")
+  FP = sum(heart_val$HeartDisease == "0" & predict == "1")
+  FN = sum(heart_val$HeartDisease == "1" & predict == "0")
+  P = TP + FN
+  N = TN + FP
+  Ps = TP + FP
+  Ns = TN + FN
+  
+  c(acc = (TP + TN) / (P+N),
+    sens = TP/P,
+    spec = TN/N ,
+    preci = TP/Ps
+   )
+}
+
+
+glm.probs = predict(LR_model, heart_val, type = "response")
+cutoffs = seq(from = 0.1, to = 1, by = 0.2)
+results = sapply(cutoffs, calc_metrics_cutoff, probs = glm.probs)
+result_table <- tibble(data.frame(Cutoff = cutoffs,
+                    Accuracy = results[1, ],
+                    Sensitivity = results[2, ],
+                    Specificity = results[3, ],
+                    Precision = results[4, ]))
+result_table
+```
+
+```{r}
+ggplot(result_table, aes(x = Cutoff)) +
+  geom_line(aes(y = Accuracy, color = "Accuracy"), linewidth = 1.2) +
+  geom_line(aes(y = Sensitivity, color = "Sensitivity"), linewidth = 1.2) +
+  geom_line(aes(y = Specificity, color = "Specificity"), linewidth = 1.2) +
+  geom_line(aes(y = Precision, color = "Precision"), linewidth = 1.2) +
+  scale_color_manual(name = "Metrics", values = c("Accuracy" = "lightblue4",
+                                                  "Sensitivity" = "maroon3",
+                                                  "Specificity" = "olivedrab3",
+                                                  "Precision" = "navyblue")) +
+  labs(title = "Model Performance at Different Cutoffs", x = "Cutoffs", y = "Metric Value") +
+  theme_minimal() +
+  scale_x_continuous(breaks = cutoffs)
+```
+
+In order to optimize the important metrics of precision and recall (sensitivity), a suitable cutoff point needs to be determined for the logistic regression model. After analysis of the last plot, it has been identified that the optimal cutoff point lies around 0.5. It is the same cutoff we have used before. Therefore, there will be no need of new model.
+
+*Random Forest*
+
+Random Forest is a machine learning algorithm commonly used for classification tasks. It belongs to the ensemble learning methods, which combine multiple individual models to make more accurate predictions.
+
+The Random Forest algorithm creates an ensemble of decision trees. Each decision tree is built using a random subset of the training data and a random subset of the features. During the training process, the decision trees learn to classify instances by recursively splitting the feature space based on different attribute values.
+
+```{r}
+library(randomForest)
+set.seed(42)
+randomforest_model = randomForest(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est, ntree = 12, mtry = 10)
+randomforest_val_pred = predict(randomforest_model, heart_val, type = "class")
+
+randomforest_val_confusion_matrix = confusionMatrix(randomforest_val_pred, heart_val$HeartDisease)
+randomforest_val_missclass = calc_misclass(heart_val$HeartDisease, randomforest_val_pred )
+randomforest_val_accuracy = randomforest_val_confusion_matrix$overall["Accuracy"]
+randomforest_val_precision = randomforest_val_confusion_matrix$byClass["Pos Pred Value"]
+randomforest_val_recall = randomforest_val_confusion_matrix$byClass["Sensitivity"]
+randomforest_val_f1_score = randomforest_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(randomforest_val_missclass, randomforest_val_accuracy, randomforest_val_precision, randomforest_val_recall, randomforest_val_f1_score)))
+```
+
+*SVM*
+
+SVM stands for Support Vector Machines. It is a popular supervised machine learning algorithm used for both classification and regression tasks.
+
+The main idea behind SVM is to find the optimal hyperplane that separates different classes in the feature space. The hyperplane is determined by a subset of training data called support vectors, which are the closest points to the decision boundary. SVM aims to maximize the margin between the support vectors from different classes, allowing for better generalization to unseen data.
+
+```{r}
+library(e1071)
+SVM_linear_model = svm(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est, karnel = "linear")
+SVM_linear_val_pred = predict(SVM_linear_model, heart_val, type = "class")
+
+SVM_linear_val_confusion_matrix = confusionMatrix(SVM_linear_val_pred, heart_val$HeartDisease)
+SVM_linear_val_missclass = calc_misclass(heart_val$HeartDisease, SVM_linear_val_pred )
+SVM_linear_val_accuracy = SVM_linear_val_confusion_matrix$overall["Accuracy"]
+SVM_linear_val_precision = SVM_linear_val_confusion_matrix$byClass["Pos Pred Value"]
+SVM_linear_val_recall = SVM_linear_val_confusion_matrix$byClass["Sensitivity"]
+SVM_linear_val_f1_score = SVM_linear_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(SVM_linear_val_missclass, SVM_linear_val_accuracy, SVM_linear_val_precision, SVM_linear_val_recall, SVM_linear_val_f1_score)))
+```
+
+```{r}
+SVM_poly_model = svm(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est, karnel = "polynomial", degree = 3)
+SVM_poly_val_pred = predict(SVM_poly_model, heart_val, type = "class")
+
+SVM_poly_val_confusion_matrix = confusionMatrix(SVM_poly_val_pred, heart_val$HeartDisease)
+SVM_poly_val_missclass = calc_misclass(heart_val$HeartDisease, SVM_poly_val_pred )
+SVM_poly_val_accuracy = SVM_poly_val_confusion_matrix$overall["Accuracy"]
+SVM_poly_val_precision = SVM_poly_val_confusion_matrix$byClass["Pos Pred Value"]
+SVM_poly_val_recall = SVM_poly_val_confusion_matrix$byClass["Sensitivity"]
+SVM_poly_val_f1_score = SVM_poly_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(SVM_poly_val_missclass, SVM_poly_val_accuracy, SVM_poly_val_precision, SVM_poly_val_recall, SVM_poly_val_f1_score)))
+```
+
+```{r}
+SVM_sigmo_model = svm(heart_est$HeartDisease ~ Age + Sex + ChestPainType +  RestingBP + Cholesterol + FastingBS + RestingECG - MaxHR + ExerciseAngina + Oldpeak + ST_Slope + Age:Oldpeak + Age:MaxHR + Age:Cholesterol , data = heart_est, karnel = "sigmoid")
+SVM_sigmo_val_pred = predict(SVM_sigmo_model, heart_val, type = "class")
+
+SVM_sigmo_val_confusion_matrix = confusionMatrix(SVM_sigmo_val_pred, heart_val$HeartDisease)
+SVM_sigmo_val_missclass = calc_misclass(heart_val$HeartDisease, SVM_poly_val_pred )
+SVM_sigmo_val_accuracy = SVM_sigmo_val_confusion_matrix$overall["Accuracy"]
+SVM_sigmo_val_precision = SVM_sigmo_val_confusion_matrix$byClass["Pos Pred Value"]
+SVM_sigmo_val_recall = SVM_sigmo_val_confusion_matrix$byClass["Sensitivity"]
+SVM_sigmo_val_f1_score = SVM_sigmo_val_confusion_matrix$byClass["F1"]
+
+kable(data.frame(Metric = c("Misclassification", "Accuracy", "Precision", "Recall", "F1-Score"),Value = c(SVM_sigmo_val_missclass, SVM_sigmo_val_accuracy, SVM_sigmo_val_precision, SVM_sigmo_val_recall, SVM_sigmo_val_f1_score)))
+```
+
+**Conclusion**
+
+```{r}
+# Best LDA
+complex_lda_tst_pred = predict(complex_lda_model, heart_tst)$class
+
+
+complex_lda_tst_confusion_matrix = confusionMatrix(complex_lda_tst_pred, heart_tst$HeartDisease, positive = "1")
+complex_lda_tst_missclass = calc_misclass(heart_tst$HeartDisease, complex_lda_tst_pred )
+complex_lda_tst_precision = complex_lda_tst_confusion_matrix$byClass["Pos Pred Value"]
+complex_lda_tst_recall = complex_lda_tst_confusion_matrix$byClass["Sensitivity"]
+complex_lda_tst_f1_score = complex_lda_tst_confusion_matrix$byClass["F1"]
+
+
+# Best QDA
+simple_qda_tst_pred =  predict(simple_qda_model, heart_tst)$class
+
+
+simple_qda_tst_confusion_matrix = confusionMatrix(simple_qda_tst_pred, heart_tst$HeartDisease, positive = "1")
+simple_qda_tst_missclass = calc_misclass(heart_tst$HeartDisease, simple_qda_tst_pred )
+simple_qda_tst_precision = simple_qda_tst_confusion_matrix$byClass["Pos Pred Value"]
+simple_qda_tst_recall = simple_qda_tst_confusion_matrix$byClass["Sensitivity"]
+simple_qda_tst_f1_score = simple_qda_tst_confusion_matrix$byClass["F1"]
+
+
+# Best NB
+complex_NB_tst_pred =  predict(complex_NB_model, heart_tst, type = "class")
+
+
+complex_NB_tst_confusion_matrix = confusionMatrix(complex_NB_tst_pred, heart_tst$HeartDisease, positive = "1")
+complex_NB_tst_missclass = calc_misclass(heart_tst$HeartDisease, complex_NB_tst_pred )
+complex_NB_tst_precision = complex_NB_tst_confusion_matrix$byClass["Pos Pred Value"]
+complex_NB_tst_recall = complex_NB_tst_confusion_matrix$byClass["Sensitivity"]
+complex_NB_tst_f1_score = complex_NB_tst_confusion_matrix$byClass["F1"]
+
+
+# Best KNN
+knn_tst_pred =  predict(knn_model, heart_tst, type = "class" )
+
+knn_tst_confusion_matrix = confusionMatrix(knn_tst_pred, heart_tst$HeartDisease)
+knn_tst_missclass = calc_misclass(heart_tst$HeartDisease, knn_tst_pred )
+knn_tst_precision = knn_tst_confusion_matrix$byClass["Pos Pred Value"]
+knn_tst_recall = knn_tst_confusion_matrix$byClass["Sensitivity"]
+knn_tst_f1_score = knn_tst_confusion_matrix$byClass["F1"]
+
+
+# Best tree
+tree_tst_pred =  predict(tree_model, heart_tst, type = "class" )
+
+tree_tst_confusion_matrix = confusionMatrix(tree_tst_pred, heart_tst$HeartDisease)
+tree_tst_missclass = calc_misclass(heart_tst$HeartDisease, tree_tst_pred )
+tree_tst_precision = tree_tst_confusion_matrix$byClass["Pos Pred Value"]
+tree_tst_recall = tree_tst_confusion_matrix$byClass["Sensitivity"]
+tree_tst_f1_score = tree_tst_confusion_matrix$byClass["F1"]
+
+
+# Best Logistic Regression
+LR_tst_pred = predict(LR_model, heart_tst, type = "response")
+tst_predicted_classes = ifelse(LR_tst_pred > 0.5, 1, 0)
+
+LR_tst_confusion_matrix = confusionMatrix(factor(tst_predicted_classes), heart_tst$HeartDisease)
+LR_tst_missclass = calc_misclass(heart_tst$HeartDisease, tst_predicted_classes )
+LR_tst_precision = LR_tst_confusion_matrix$byClass["Pos Pred Value"]
+LR_tst_recall = LR_tst_confusion_matrix$byClass["Sensitivity"]
+LR_tst_f1_score = LR_tst_confusion_matrix$byClass["F1"]
+
+# Best Random Forest
+randomforest_tst_pred = predict(randomforest_model, heart_tst, type = "class")
+
+randomforest_tst_confusion_matrix = confusionMatrix(randomforest_tst_pred, heart_tst$HeartDisease)
+randomforest_tst_missclass = calc_misclass(heart_tst$HeartDisease, randomforest_tst_pred )
+randomforest_tst_precision = randomforest_tst_confusion_matrix$byClass["Pos Pred Value"]
+randomforest_tst_recall = randomforest_tst_confusion_matrix$byClass["Sensitivity"]
+randomforest_tst_f1_score = randomforest_tst_confusion_matrix$byClass["F1"]
+
+
+# Best SVM
+SVM_linear_tst_pred = predict(SVM_linear_model, heart_tst, type = "class")
+
+SVM_linear_tst_confusion_matrix = confusionMatrix(SVM_linear_tst_pred, heart_tst$HeartDisease)
+SVM_linear_tst_missclass = calc_misclass(heart_tst$HeartDisease, SVM_linear_tst_pred )
+SVM_linear_tst_precision = SVM_linear_tst_confusion_matrix$byClass["Pos Pred Value"]
+SVM_linear_tst_recall = SVM_linear_tst_confusion_matrix$byClass["Sensitivity"]
+SVM_linear_tst_f1_score = SVM_linear_tst_confusion_matrix$byClass["F1"]
+
+```
+
+```{r}
+model_names <- c("complex_lda", "simple_qda", "complex_NB", "knn", "tree", "LR", "randomforest", "SVM_linear")
+
+precision <- c(complex_lda_tst_precision, simple_qda_tst_precision, complex_NB_tst_precision, knn_tst_precision, tree_tst_precision, LR_tst_precision, randomforest_tst_precision, SVM_linear_tst_precision)
+
+recall <- c(complex_lda_tst_recall, simple_qda_tst_recall, complex_NB_tst_recall, knn_tst_recall, tree_tst_recall, LR_tst_recall, randomforest_tst_recall, SVM_linear_tst_recall)
+
+f1_score <- c(complex_lda_tst_f1_score, simple_qda_tst_f1_score, complex_NB_tst_f1_score, knn_tst_f1_score, tree_tst_f1_score, LR_tst_f1_score, randomforest_tst_f1_score, SVM_linear_tst_f1_score)
+
+missclass <- c(complex_lda_tst_missclass, simple_qda_tst_missclass, complex_NB_tst_missclass, knn_tst_missclass, tree_tst_missclass, LR_tst_missclass, randomforest_tst_missclass, SVM_linear_tst_missclass)
+
+results <- cbind(precision, recall, f1_score, missclass)
+
+rownames(results) <- model_names
+
+colnames(results) <- c("Precision", "Recall", "F1 score", "Misclassification")
+
+kable(results)
+
+```
+
+```{r}
+class_table = complex_lda_tst_confusion_matrix$table
+class_table
+
+lda.probs = predict(complex_lda_model, heart_tst)
+roc(heart_tst$HeartDisease, lda.probs$posterior[,2], plot=TRUE, print.auc=TRUE, lwd = 3, col = 'orangered')
+```
+
+\
