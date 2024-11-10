@@ -1,4 +1,5 @@
-# -Heart-Failure-Diagnosis-Classification-
+# Heart-Failure-Diagnosis-Classification
+
 For this particular project, the decision was made to apply a classification algorithm to a dataset 
 with medical subject matter. Classification algorithms have become popular for medical 
 projects due to the evolving nature of the subject and their useful function. Consequently, we 
